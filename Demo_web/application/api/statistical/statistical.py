@@ -26,13 +26,10 @@ def count_books_sold_by_shop(shop_id):
     try:
         # Chuyển đổi shop_id sang đối tượng ObjectId
         shop_id = ObjectId(shop_id)
-
         # Truy vấn cơ sở dữ liệu để lấy ra những cuốn sách của cửa hàng
         shop_books = db.books.find({'SellerId': shop_id})
-
         # Đếm số lượng cuốn sách
         books_count = len(list(shop_books))
-
         return jsonify({'books_count': books_count})
 
     except Exception as e:
@@ -41,14 +38,14 @@ def count_books_sold_by_shop(shop_id):
         return jsonify({'error': 'Đã xảy ra lỗi'}), 500
 
 
-@statisticalBP.route('/orders_count/<shop_id>', methods=['GET'])
-def count_orders_sold_by_shop(shop_id):
+@statisticalBP.route('/orders_count/<shop_id>/<status>', methods=['GET'])
+def count_orders_sold_by_shop_of_status(shop_id, status):
     try:
         # Chuyển đổi shop_id sang đối tượng ObjectId
         shop_id = ObjectId(shop_id)
 
         # Truy vấn cơ sở dữ liệu để lấy ra những đơn hàng đã được xác nhận của cửa hàng
-        confirmed_orders = db.OrderDetails.find({'ShopId': shop_id, 'Status': 'completed'})
+        confirmed_orders = db.OrderDetails.find({'ShopId': shop_id, 'Status': status})
 
         # Đếm số lượng đơn hàng đã được xác nhận
         orders_count = len(list(confirmed_orders))
@@ -60,6 +57,23 @@ def count_orders_sold_by_shop(shop_id):
         print(f"Lỗi đếm số lượng đơn hàng của cửa hàng {shop_id}: {str(e)}")
         return jsonify({'error': 'Đã xảy ra lỗi'}), 500
 
+@statisticalBP.route('/orders_count/<shop_id>', methods=['GET'])
+def count_orders_sold_by_shop(shop_id):
+    try:
+        # Chuyển đổi shop_id sang đối tượng ObjectId
+        shop_id = ObjectId(shop_id)
+
+        # Truy vấn cơ sở dữ liệu để lấy ra những đơn hàng đã được xác nhận của cửa hàng
+        confirmed_orders = db.OrderDetails.find({'ShopId': shop_id})
+
+        # Đếm số lượng đơn hàng đã được xác nhận
+        orders_count = len(list(confirmed_orders))
+
+        return jsonify({'orders_count': orders_count})
+    except Exception as e:
+        # Xử lý nếu có lỗi xảy ra
+        print(f"Lỗi đếm số lượng đơn hàng của cửa hàng {shop_id}: {str(e)}")
+        return jsonify({'error': 'Đã xảy ra lỗi'}), 500
 
 @statisticalBP.route('/sold_books_count/<shop_id>', methods=['GET'])
 def count_sold_books_by_shop(shop_id):
@@ -117,3 +131,37 @@ def count_buyers_by_shop(shop_id):
         # Xử lý nếu có lỗi xảy ra
         print(f"Lỗi thống kê số lượng người mua của cửa hàng {shop_id}: {str(e)}")
         return jsonify({'error': 'Đã xảy ra lỗi'}), 500
+
+@statisticalBP.get("/sales_quantity/<shop_id>")
+def GetSales_quantity(shop_id):
+    sales_quantity = 'Sales_quantity'
+    pipeline = [
+        {
+            '$match': {'SellerId': ObjectId(shop_id)}
+        },
+        {
+            '$group': {
+                '_id': None,
+                'total': {'$sum': f'${sales_quantity}'}
+            }
+        }
+    ]
+    result = list(db.books.aggregate(pipeline))
+    return result
+
+@statisticalBP.get("/total_amount_of_day/<day>")
+def Get_Total_Amount_Of_Day(shop_id):
+    sales_quantity = 'Sales_quantity'
+    pipeline = [
+        {
+            '$match': {'SellerId': ObjectId(shop_id)}
+        },
+        {
+            '$group': {
+                '_id': None,
+                'total': {'$sum': f'${sales_quantity}'}
+            }
+        }
+    ]
+    result = list(db.books.aggregate(pipeline))
+    return result

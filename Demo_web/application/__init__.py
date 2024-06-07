@@ -1,8 +1,6 @@
-from flask_socketio import SocketIO
 from flask import Flask
 from flask_cors import CORS
 import cloudinary.api
-
 from Demo_web.application.api.auth.auth import authBP
 from Demo_web.application.api.users.users import usersBP
 from Demo_web.application.api.books.books import booksBP
@@ -22,9 +20,6 @@ def create_app(debug=False):
         app = Flask(__name__)
         app.debug = debug
         CORS(app, origins="*")
-        # socketio = SocketIO(app)
-
-        # socketio.init_app(app)
 
         app.register_blueprint(authBP, url_prefix='/auth')
         app.register_blueprint(usersBP, url_prefix='/user')

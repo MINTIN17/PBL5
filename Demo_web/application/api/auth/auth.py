@@ -1,7 +1,8 @@
 import os
 from Demo_web.application.utils import check_password, hash_password
 import jwt
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, render_template, send_file
+
 authBP = Blueprint('auth', __name__)
 
 from dotenv import load_dotenv
@@ -42,32 +43,22 @@ def login():
                 "token": token,
             }
         else:
-            return jsonify({'error': "Sai tai khoan hoac mat khau"})
+            return jsonify({'error': "Sai tai khoan hoac mat khau"}), 401
     except Exception as e:
         print(f"Error: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
-@authBP.post("/register")
-def register():
-    data = request.json
-    if not data:
-        print("loi")
+def register(email, password):
     shop_name = ""
-    password = data.get('password')
     name = "user"
-    email = data.get('email')
     phone = ""
     address = ""
     role = "user"
     image = "https://res.cloudinary.com/di53bdbjf/image/upload/v1714654040/R_vxfsuw.jpg"
     try:
-        user_collection = db['Users']
-        user = user_collection.find_one({'Email': email})
-        if user:
-            return jsonify({'message': 'Email already exists'}), 400
         hashed_password = hash_password(password)
 
-        user = user_collection.insert_one({
+        user = db.Users.insert_one({
             'Shop_name': shop_name,
             'Name': name,
             'Email': email,
@@ -78,23 +69,50 @@ def register():
             'Role': role,
             "IsActivate": 0
         }).inserted_id
-        return "Dang ki thanh cong"
     except Exception as e:
         print(f"Error: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
-@authBP.get("/activation/<email>")
+@authBP.post("/activation/<email>")
 def send_code(email):
+    user_collection = db['Users']
+    user = user_collection.find_one({'Email': email})
+    if user:
+        return jsonify({'message': 'Email already exists'}), 400
     account_activation.send_mail(email)
     return "sender"
 
-@authBP.get("/check/<email>")
+@authBP.post("/check/<email>")
 def check_activation_code(email):
     data = request.json
     activation_code = data.get('activation_code')
+    password = data.get('password')
     if account_activation.check_activation_code(email, activation_code) is True:
-        return "Activation success"
+        register(email, password)
+        return "register success"
     else:
-        return "activation code wrong or expired"
+        return "activation code wrong or expired", 400
 
+@authBP.post("/reset_password/<email>")
+def send_token_reset_password(email):
+    account_activation.send_reset_email(email)
+    return "sender"
 
+@authBP.post("/resetpassword")
+def reset_password():
+    data = request.json
+    new_password = data.get('new_password')
+    email = data.get('email')
+    db.Users.update_one(
+        {
+            "Email": email
+        },
+        {
+            "$set": {
+                'Password': hash_password(new_password)
+            }
+        }
+    )
+    return {
+        "email": email
+    }

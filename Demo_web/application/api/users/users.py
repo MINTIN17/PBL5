@@ -1,17 +1,12 @@
 import os
-
 from bson import ObjectId
-
 from Demo_web.application import utils
-
-import jwt
 from flask import Blueprint, request, jsonify
 usersBP = Blueprint('users', __name__)
 
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env'))
 secret_key = os.getenv('SECRET_KEY')
-
 from Demo_web.application.db.db import db
 
 @usersBP.get("/getalluser")

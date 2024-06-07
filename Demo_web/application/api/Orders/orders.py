@@ -72,7 +72,7 @@ def place_order():
 
                 db.books.update_one(
                     {'_id': ObjectId(book_id)},
-                    {'$inc': {'Quantity': -quantity}}
+                    {'$inc': {'Quantity': -quantity, 'Sales_quantity': quantity}}
                 )
 
                 # Kiểm tra và xóa sách khỏi giỏ hàng nếu có
@@ -186,12 +186,9 @@ def place_order():
                 'DiscountId': discount_id,
                 'ShopId': ObjectId(shop_id),  # Xác định shop_id cho từng order_detail
                 'UserId': user_id,
-                'Status': order_data['status']
+                'Status': 'Đang chờ xác nhận'
             }
             db.OrderDetails.insert_one(order_detail)
-
         return jsonify({'success': True, 'message': 'Đặt hàng thành công'}), 201
-
-
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

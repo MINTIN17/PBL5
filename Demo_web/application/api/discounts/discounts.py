@@ -58,6 +58,7 @@ def CreateDiscount(id):
             quantity = data.get('quantity')
             start_day = data.get('start_day')
             end_day = data.get('end_day')
+            condition = data.get('condition')
             start_day = datetime.strptime(start_day, "%Y-%m-%dT%H:%M:%S.%f%z")
             end_day = datetime.strptime(end_day, "%Y-%m-%dT%H:%M:%S.%f%z")
             if db.Discounts.find_one({"ShopId": ObjectId(id), "DiscountCode": code}):
@@ -70,7 +71,8 @@ def CreateDiscount(id):
                     "Quantity": quantity,
                     'StartDay': start_day,
                     'EndDay': end_day,
-                    'ShopId': ObjectId(id)
+                    'ShopId': ObjectId(id),
+                    "condition": condition
                 }).inserted_id
         return "create discount success"
     except Exception as e:

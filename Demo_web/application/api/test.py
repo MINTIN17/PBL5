@@ -1,9 +1,28 @@
-import time
+from chatterbot import ChatBot
+from chatterbot.trainers import ChatterBotCorpusTrainer
 
-start_time = time.time()
-# Một số hoạt động cần đo thời gian
-time.sleep(2)  # Tạm dừng chương trình trong 2 giây
-end_time = time.time()
+# Tạo một chatbot mới
+chatbot = ChatBot(
+    'MyBot',
+    storage_adapter='chatterbot.storage.SQLStorageAdapter',
+    logic_adapters=[
+        'chatterbot.logic.MathematicalEvaluation',
+        'chatterbot.logic.BestMatch'
+    ],
+    database_uri='sqlite:///database.sqlite3'
+)
 
-elapsed_time = end_time - start_time
-print(f"Thời gian đã trôi qua: {elapsed_time} giây")
+# Huấn luyện chatbot với dữ liệu mẫu
+trainer = ChatterBotCorpusTrainer(chatbot)
+trainer.train('chatterbot.corpus.english')
+
+print("Chatbot đã sẵn sàng để trò chuyện!")
+
+# Bắt đầu trò chuyện với chatbot
+while True:
+    try:
+        user_input = input("Bạn: ")
+        bot_response = chatbot.get_response(user_input)
+        print(f"Bot: {bot_response}")
+    except (KeyboardInterrupt, EOFError, SystemExit):
+        break

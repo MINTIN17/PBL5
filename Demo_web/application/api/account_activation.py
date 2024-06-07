@@ -2,21 +2,27 @@ import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from itsdangerous import URLSafeTimedSerializer
 from dotenv import load_dotenv
 import random
+from time import time
 import time
 import threading
 
 load_dotenv()
 password_key = os.getenv('PASSWORD_KEY')
-
+secret_key = os.getenv('SECRET_KEY')
+security_password_salt = os.getenv('SECURITY_PASSWORD_SALT')
 activation_data = {}
-
+checked_tokens = []
+sender_email = "webbooksw@gmail.com"
+SMTP_SERVER = 'smtp.gmail.com'
+SMTP_PORT = 465
 
 def generate_activation_code():
     return str(random.randint(100000, 999999))
 
-
+# Hàm xác nhận mã xác minh
 def is_valid_activation_code(email, activation_code):
     clean_up_expired_codes()
 
@@ -30,14 +36,12 @@ def is_valid_activation_code(email, activation_code):
     print(current_activation_code)
     print(activation_code)
     if activation_code != current_activation_code or time.time() - activation_time > (2 * 60):
-        print(2)
         return False
-
     return True
 
-
+# Hàm gửi mã xác nhận đến mail
 def send_activation_email(receiver_email, activation_code):
-    sender_email = "webbooksw@gmail.com"
+
     password = password_key
 
     message = MIMEMultipart("alternative")
@@ -68,19 +72,17 @@ def send_activation_email(receiver_email, activation_code):
             padding: 0;
           }}
           .container {{
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            background-color: #f9f9f9;   
+            padding: 20px;    
+            border-radius: 8px;    
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);       
           }}
           h1 {{
             color: #007bff;
-            margin-top: 0;
+            font-size: 24px;
           }}
           .activation-code {{
-            font-size: 24px;
+            font-size: 26px;
             font-weight: bold;
             color: #007bff;
           }}
@@ -105,7 +107,7 @@ def send_activation_email(receiver_email, activation_code):
     message.attach(part2)
 
     # Sử dụng máy chủ SMTP của Gmail, port 465 với SSL
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+    with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
         server.login(sender_email, password)
         server.sendmail(sender_email, receiver_email, message.as_string())
 
@@ -115,8 +117,6 @@ def send_mail(email):
     activation_time = time.time()
     activation_data[email] = (activation_code, activation_time)
     send_activation_email(email, activation_code)
-    print(activation_data)
-
 
 def check_activation_code(email, activation_code):
     if is_valid_activation_code(email, activation_code):
@@ -140,6 +140,50 @@ def start_clean_up_timer():
         clean_up_expired_codes()
         time.sleep(60)  # Kiểm tra mỗi phút
 
+# tạo token
+def generate_reset_token(email, expiration=300):
+    serializer = URLSafeTimedSerializer(secret_key)
+    return serializer.dumps(email, salt=security_password_salt)
+
+# Hàm xác nhận token
+def confirm_reset_token(token, expiration=300):
+    serializer = URLSafeTimedSerializer(secret_key)
+    global checked_tokens
+    if token in checked_tokens:
+        try:
+            email = serializer.loads(token, salt=security_password_salt, max_age=expiration)
+        except:
+            return False
+    else:
+        return False
+    checked_tokens.remove(token)
+    return email
+
+# Hàm gửi token reset password
+def send_reset_email(to_email):
+    global checked_tokens
+    token = generate_reset_token(to_email)
+    checked_tokens.append(token)
+    reset_url = f'https://9d0b-113-22-229-219.ngrok-free.app/reset_password/{token}'
+
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = to_email
+    msg['Subject'] = 'Đặt lại mật khẩu'
+
+    body = f'Nhấp vào liên kết sau để đặt lại mật khẩu của bạn: {reset_url}\nLiên kết sẽ hết hạn sau 5 phút.'
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        server = smtplib.SMTP(SMTP_SERVER, 587)
+        server.starttls()
+        server.login(sender_email, password_key)
+        text = msg.as_string()
+        server.sendmail(sender_email, to_email, text)
+        server.quit()
+        print('Email đặt lại mật khẩu đã được gửi!')
+    except Exception as e:
+        print(f'Có lỗi xảy ra khi gửi email: {e}')
 
 # Khởi động một thread để chạy hàm clean_up_expired_codes định kỳ
 cleanup_thread = threading.Thread(target=start_clean_up_timer, daemon=True)

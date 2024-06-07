@@ -67,6 +67,59 @@ def GetListBooks():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+@booksBP.get("/gettopbook")
+def GetTopBooks():
+    try:
+        List_books = db.books.aggregate([
+            {
+                "$lookup": {
+                    "from": "Users",
+                    "localField": "SellerId",
+                    "foreignField": "_id",
+                    "as": "Seller"
+                }
+            },
+            {
+                "$unwind": "$Seller"
+            },
+            {
+                "$lookup": {
+                    "from": "Genres",
+                    "localField": "Genre",
+                    "foreignField": "_id",
+                    "as": "genre"
+                }
+            },
+            {
+                "$unwind": "$genre"
+            },
+            {
+                "$group": {
+                    "_id": {"$toString": "$_id"},
+                    "title": {"$first": "$Title"},
+                    "genre": {"$first": "$genre.Theloai"},
+                    "description": {"$first": "$Description"},
+                    "quantity": {"$first": "$Quantity"},
+                    "price": {"$first": "$Price"},
+                    "AuthorName": {"$first": "$AuthorName"},
+                    "PublisherName": {"$first": "$PublisherName"},
+                    "image": {"$first": "$image"},
+                    "Sellers": {"$first": "$Seller.Name"},
+                    "Sales_quantity": {"$first": "$Sales_quantity"}
+                }
+            },
+            {
+                "$sort": {"Sales_quantity": -1}  # Sắp xếp giảm dần theo Sales_quantity
+            },
+            {
+                "$limit": 20  # Giới hạn số lượng kết quả là 20
+            }
+        ])
+        List_books = list(List_books)
+        return (List_books)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @booksBP.get("/<id>")
 def GetBookById(id):
     try:
@@ -209,7 +262,8 @@ def Create_book():
                 'AuthorName': author_name,
                 'PublisherName': publisher_name,
                 "image": image,
-                "time_create": time_create
+                "time_create": time_create,
+                "Sales_quantity": 0
             }).inserted_id
 
             return "create new book success"
@@ -283,13 +337,13 @@ def Update_book(id):
 @booksBP.get("/fix")
 def fix():
     try:
-        specific_datetime = datetime(2024, 5, 3, 9, 28, 57, 652000, tzinfo=pytz.utc)
+        # specific_datetime = datetime(2024, 5, 3, 9, 28, 57, 652000, tzinfo=pytz.utc)
 
         # Define the new attribute
         new_attribute = {
-            'time_create': specific_datetime
+            'condition': 0
         }
-        result = db.books.update_many({}, {'$set': new_attribute})
+        result = db.Discounts.update_many({}, {"$set": new_attribute})
         return "fix ok"
     except Exception as e:
         return jsonify({"error": str(e)})
