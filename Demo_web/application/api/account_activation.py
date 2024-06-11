@@ -164,7 +164,7 @@ def send_reset_email(to_email):
     global checked_tokens
     token = generate_reset_token(to_email)
     checked_tokens.append(token)
-    reset_url = f'https://9d0b-113-22-229-219.ngrok-free.app/reset_password/{token}'
+    reset_url = f'https://ef00-42-112-111-184.ngrok-free.app/reset_password/{token}'
 
     msg = MIMEMultipart()
     msg['From'] = sender_email

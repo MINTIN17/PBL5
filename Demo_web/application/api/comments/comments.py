@@ -22,8 +22,9 @@ def GetCommnet_Book(id):
         comments = db['comments']
         parent_comments = comments.find({"book_id": ObjectId(id), "parent_comment_id": None}).sort("_id")
         CommnetOfBook = []
-
         for parent_comment in parent_comments:
+            like = []
+            dislike = []
             user = db.Users.find_one({"_id": parent_comment['user_id']})
             if user:
                 parent_comment['user_name'] = user['Name']
@@ -32,12 +33,24 @@ def GetCommnet_Book(id):
             parent_comment['parent_comment_id'] = str(parent_comment['parent_comment_id']) if parent_comment[
                 'parent_comment_id'] else None
             parent_comment['_id'] = str(parent_comment['_id'])
-            parent_comment['like'] = len(parent_comment['like'])
-            parent_comment['dislike'] = len(parent_comment['dislike'])
-
-            replies = comments.find({"parent_comment_id": parent_comment['_id']})
+            parent_comment['like_count'] = len(parent_comment['like'])
+            parent_comment['dislike_count'] = len(parent_comment['dislike'])
+            for user in parent_comment['like']:
+                like.append(str(user))
+            parent_comment['like'] = like
+            for user in parent_comment['dislike']:
+                dislike.append(str(user))
+            parent_comment['dislike'] = dislike
+            replies = comments.find({"parent_comment_id": ObjectId(parent_comment['_id'])})
+            replies = list(replies)
             rep = []
             for reply in replies:
+                reply_like = []
+                reply_dislike = []
+                for user in reply['like']:
+                    reply_like.append(str(user))
+                for user in reply['dislike']:
+                    reply_dislike.append(str(user))
                 user_name_reply = db.Users.find_one({"_id": reply['user_id']})
                 if user_name_reply:
                     reply['username'] = user_name_reply['Name']
@@ -45,12 +58,13 @@ def GetCommnet_Book(id):
                 reply['book_id'] = str(reply['book_id'])
                 reply['user_id'] = str(reply['user_id'])
                 reply['parent_comment_id'] = str(reply['parent_comment_id'])
-                reply['like'] = len(reply['like'])
-                reply['dislike'] = len(reply['dislike'])
+                reply['like_count'] = len(reply['like'])
+                reply['dislike_count'] = len(reply['dislike'])
+                reply['like'] = reply_like
+                reply['dislike'] = reply_dislike
                 rep.append(reply)
             parent_comment['replies'] = rep
             CommnetOfBook.append(parent_comment)
-
         return jsonify(CommnetOfBook)
     except Exception as e:
         print("Error:", str(e))
@@ -152,6 +166,7 @@ def Like(id):
                         }
                     }
                 )
+                print(1)
                 return "unlike success"
             elif user_id in comment['dislike']:
                 db.comments.update_one(
@@ -174,6 +189,7 @@ def Like(id):
                         }
                     }
                 )
+                print(2)
                 return "like success and undislike"
             else:
                 result = db.comments.update_one(
@@ -186,6 +202,7 @@ def Like(id):
                         }
                     }
                 )
+                print(3)
                 print(result.modified_count)
                 return "like success"
         return "login da ban ei"

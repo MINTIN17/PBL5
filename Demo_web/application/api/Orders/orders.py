@@ -12,6 +12,8 @@ def place_order():
     try:
         # Lấy thông tin đơn hàng từ request
         order_data = request.json
+        address = order_data['address']
+        phone = order_data['phone']
         # Kiểm tra dữ liệu đơn hàng
         required_fields = ['userid', 'address', 'status', 'shops', 'shipping_id']
         missing_fields = [field for field in required_fields if field not in order_data]
@@ -122,7 +124,8 @@ def place_order():
             'OrderAmount': total_price,
             'UserId': user_id,
             'ShippingMethodId': ObjectId(shipping_id),
-
+            'address': address,
+            'phone': phone
         }
         result = db.Orders.insert_one(order)
         order_id = result.inserted_id
@@ -156,9 +159,9 @@ def place_order():
 
                 total_price_shop += quantity * price
             # Lấy thông tin giảm giá từ cơ sở dữ liệu (nếu có)
-            discount_id = shop.get('discount_id')
-            if discount_id:
-                discount = db.Discounts.find_one({'_id': ObjectId(discount_id)})
+            discount_id = ObjectId(shop.get('discount_id'))
+            if discount_id is not None:
+                discount = db.Discounts.find_one({'_id': discount_id})
                 if discount:
                     discount_amount = discount.get('DiscountAmount', 0)
                     discount_percent = discount.get('DiscountPercent', 0)
@@ -168,7 +171,9 @@ def place_order():
                         total_price_shop -= discount_amount
                     else:
                         total_price_shop *= (100 - discount_percent) / 100
-
+            else:
+                discount_id = ""
+                print("don't have discount")
             # Cộng thêm phí vận chuyển
             shipping_id = order_data['shipping_id']
             shipping_method = db.ShippingMethods.find_one({'_id': ObjectId(shipping_id)})

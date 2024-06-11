@@ -17,19 +17,48 @@ def GetListUser():
     page = int(request.args.get('page', 1))
     limit = int(request.args.get('limit', 10))
     skip = (page - 1) * limit
-
+    count = 0
     if token.get('role') == 'admin':
         try:
             users = db['Users']
-            result = users.find().skip(skip).limit(limit)
+            result = users.find({'Status': 'normal'}).skip(skip).limit(limit)
             result = list(result)
             for user in result:
+                count += 1
                 user['_id'] = str(user['_id'])
             # print(result)
             result = utils.convert_to_json(result)
             return {
                 "users": result,
-                "count": db.Users.estimated_document_count(),
+                "count": count,
+            }
+        except Exception as e:
+            return jsonify({"error": str(e)})
+    else:
+        return jsonify({"message": "khong du quyen han"})
+
+@usersBP.get("/getalluserban")
+def GetListUserBan():
+    token = request.headers.get('Authorization')
+    token = utils.extract_token(token)
+
+    page = int(request.args.get('page', 1))
+    limit = int(request.args.get('limit', 10))
+    skip = (page - 1) * limit
+    count = 0
+    if token.get('role') == 'admin':
+        try:
+            users = db['Users']
+            result = users.find({'Status': 'ban'}).skip(skip).limit(limit)
+            result = list(result)
+            for user in result:
+                count += 1
+                user['_id'] = str(user['_id'])
+            # print(result)
+            result = utils.convert_to_json(result)
+            return {
+                "users": result,
+                "count": count,
             }
         except Exception as e:
             return jsonify({"error": str(e)})
@@ -89,24 +118,79 @@ def UpdateUser(id):
     else:
         return jsonify({"message": "khong du quyen han"})
 
-@usersBP.delete("/<id>")
-def DeleteUser(id):
+# @usersBP.delete("/<id>")
+# def DeleteUser(id):
+#     token = request.headers.get('Authorization')
+#     token = utils.extract_token(token)
+#     if token.get('role') == 'admin':
+#         id = ObjectId(id)
+#         try:
+#             result = db.Users.delete_one({'_id': id})
+#
+#             # Xóa sách
+#             books = db.Users.find({'SellerId': id})
+#             for book in books:
+#                 result = db.books.delete_one({'_id': book['_id']})
+#             # Xóa cart
+#             carts = db.Carts.find({'user_id': id})
+#             for cart in carts:
+#                 result = db.Carts.delete_one({'_id': cart['_id']})
+#             # Xóa discount
+#             discounts = db.Discounts.find({'ShopId': id})
+#             for discount in discounts:
+#                 result = db.Discounts.delete_one({'_id': discount['_id']})
+#             # Xóa conversation
+#             list_conversation = db.Conversations.find({
+#                 "$or": [
+#                     {"user_id_1": id},
+#                     {"user_id_2": id}
+#                 ]
+#             })
+#             for conversation in list_conversation:
+#                 # Xóa message
+#                 messages = db.Messages.find({'conversationId': conversation['_id']})
+#                 for message in messages:
+#                     result = db.Messages.delete_one({'_id': message['_id']})
+#                 result = db.Conversations.delete_one({'_id': conversation['_id']})
+#
+#
+#
+#             if result.deleted_count == 1:
+#                 return f"User with _id {str(id)} has been deleted successfully."
+#             else:
+#                 return f"User with _id {str(id)} not found."
+#         except Exception as e:
+#             return jsonify({"error": str(e)})
+#     else:
+#         return jsonify({"message": "khong du quyen han"})
+
+@usersBP.put("/ban/<id>")
+def Ban_user(id):
+    id = ObjectId(id)
     token = request.headers.get('Authorization')
     token = utils.extract_token(token)
+    try:
+        if token.get('role') == 'admin':
+            result = db.Users.update_one({'_id': id}, {"$set": {'Status': 'ban',}})
+            return f"User with _id {str(id)} has been ban successfully."
+        else:
+            return "khong du quyen han"
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
-    if token.get('role') == 'admin':
-        id = ObjectId(id)
-        try:
-            result = db.Users.delete_one({'_id': id})
-
-            if result.deleted_count == 1:
-                return f"User with _id {str(id)} has been deleted successfully."
-            else:
-                return f"User with _id {str(id)} not found."
-        except Exception as e:
-            return jsonify({"error": str(e)})
-    else:
-        return jsonify({"message": "khong du quyen han"})
+@usersBP.put("/unban/<id>")
+def Unban_user(id):
+    id = ObjectId(id)
+    token = request.headers.get('Authorization')
+    token = utils.extract_token(token)
+    try:
+        if token.get('role') == 'admin':
+            result = db.Users.update_one({'_id': id}, {"$set": {'Status': 'normal', }})
+            return f"User with _id {str(id)} has been unban successfully."
+        else:
+            return "khong du quyen han"
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 @usersBP.get("/role/<role_account>")
 def GetUserByRole(role_account):
@@ -134,7 +218,7 @@ def GetUserByRole(role_account):
                 return jsonify({"error": str(e)})
         if role_account == 'seller':
             try:
-                users = db['Users'].find({"Role": "seller"}).skip(skip).limit(limit)
+                users = db['Users'].find({"Role": "seller", "Status": "normal"}).skip(skip).limit(limit)
                 users = list(users)
                 for user in users:
                     user['_id'] = str(user['_id'])
@@ -148,7 +232,7 @@ def GetUserByRole(role_account):
                 return jsonify({"error": str(e)})
         else:
             try:
-                users = db['Users'].find({"Role": "user"}).skip(skip).limit(limit)
+                users = db['Users'].find({"Role": "user", "Status": "normal"}).skip(skip).limit(limit)
                 users = list(users)
                 for user in users:
                     user['_id'] = str(user['_id'])

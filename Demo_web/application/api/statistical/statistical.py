@@ -1,5 +1,9 @@
-from bson import ObjectId
+from datetime import datetime
+
+from bson import ObjectId, SON
 from flask import Blueprint, jsonify
+from flask_pymongo import ASCENDING
+
 from Demo_web.application.db.db import db
 
 statisticalBP = Blueprint('statistical', __name__)
@@ -64,7 +68,7 @@ def count_orders_sold_by_shop(shop_id):
         shop_id = ObjectId(shop_id)
 
         # Truy vấn cơ sở dữ liệu để lấy ra những đơn hàng đã được xác nhận của cửa hàng
-        confirmed_orders = db.OrderDetails.find({'ShopId': shop_id})
+        confirmed_orders = db.OrderDetails.find({'ShopId': shop_id, 'Status': 'Đã xác nhận'})
 
         # Đếm số lượng đơn hàng đã được xác nhận
         orders_count = len(list(confirmed_orders))
@@ -137,31 +141,120 @@ def GetSales_quantity(shop_id):
     sales_quantity = 'Sales_quantity'
     pipeline = [
         {
-            '$match': {'SellerId': ObjectId(shop_id)}
+            '$match': {'ShopId': ObjectId(shop_id), 'Status': 'Đã xác nhận'}
+        },
+        {
+            "$addFields": {
+                "totalBookCount": {"$sum": "$Quantity"}
+            }
         },
         {
             '$group': {
                 '_id': None,
-                'total': {'$sum': f'${sales_quantity}'}
+                "totalBookCount": {"$sum": "$totalBookCount"}
+            }
+        },
+        {
+            "$project": {
+                "totalBookCount": 1,
+                "_id": 0
             }
         }
     ]
-    result = list(db.books.aggregate(pipeline))
+    result = list(db.OrderDetails.aggregate(pipeline))
+    if len(result) == 0:
+        return [{"totalBookCount": 0}]
     return result
 
-@statisticalBP.get("/total_amount_of_day/<day>")
-def Get_Total_Amount_Of_Day(shop_id):
-    sales_quantity = 'Sales_quantity'
-    pipeline = [
-        {
-            '$match': {'SellerId': ObjectId(shop_id)}
-        },
-        {
-            '$group': {
-                '_id': None,
-                'total': {'$sum': f'${sales_quantity}'}
+@statisticalBP.get("/total_amount_of_month/<shop_id>/<year>")
+def Get_Total_Amount_And_OrderDetail_Count_Of_Month(shop_id, year):
+    try:
+        # Ensure the year is an integer
+        year = int(year)
+
+        # Define the start and end dates for the given year
+        start_date = datetime(year, 1, 1)
+        end_date = datetime(year + 1, 1, 1)
+
+        # Define the aggregation pipeline
+        pipeline = [
+            {
+                "$lookup": {
+                    "from": "Orders",
+                    "localField": "OrderId",
+                    "foreignField": "_id",
+                    "as": "order"
+                }
+            },
+            {
+                "$unwind": "$order"
+            },
+            {
+                "$match": {
+                    "ShopId": ObjectId(shop_id),
+                    "order.OrderDate": {
+                        "$gte": start_date,
+                        "$lt": end_date
+                    },
+                    "Status": "Đã xác nhận"
+                }
+            },
+            {
+                "$addFields": {
+                    "month": {"$month": "$order.OrderDate"},
+                    "amount": "$Total_price",
+                    "totalBookCount": {"$sum": "$Quantity"}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$month",
+                    "totalAmount": {"$sum": "$amount"},
+                    "totalOrderDetails": {"$sum": 1},  # Count of OrderDetails
+                    "uniqueUserCount": {"$addToSet": "$UserId"},
+                    "totalBookCount": {"$sum": "$totalBookCount"}
+                }
+            },
+            {
+                "$project": {
+                    "month": "$_id",
+                    "totalAmount": 1,
+                    "totalOrderDetails": 1,
+                    "uniqueUserCount": {"$size": "$uniqueUserCount"},
+                    "totalBookCount": 1,
+                    "_id": 0
+                }
+            },
+            {
+                "$sort": {"month": 1}
             }
-        }
-    ]
-    result = list(db.books.aggregate(pipeline))
-    return result
+        ]
+
+        # Execute the aggregation pipeline
+        result = list(db.OrderDetails.aggregate(pipeline))
+
+        # Initialize a dictionary with all months set to default values
+        months_data = {month: {
+            "month": month,
+            "totalAmount": 0.0,
+            "totalOrderDetails": 0,
+            "uniqueUserCount": 0,
+            "totalBookCount": 0
+        } for month in range(1, 13)}
+
+        # Update the dictionary with the results from the aggregation
+        for item in result:
+            months_data[item['month']] = item
+
+        # Convert the dictionary to a sorted list
+        final_result = [months_data[month] for month in range(1, 13)]
+
+        return final_result
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+
+
+

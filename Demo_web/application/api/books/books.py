@@ -34,6 +34,11 @@ def GetListBooks():
                 "$unwind": "$Seller"
             },
             {
+                "$match": {
+                    "Seller.Status": "normal"
+                }
+            },
+            {
                 "$lookup": {
                     "from": "Genres",
                     "localField": "Genre",
@@ -81,6 +86,11 @@ def GetTopBooks():
             },
             {
                 "$unwind": "$Seller"
+            },
+            {
+                "$match": {
+                    "Seller.status": "normal"
+                }
             },
             {
                 "$lookup": {
@@ -146,15 +156,20 @@ def GetBookByAuthorName(author_name):
         books = db.books.find({"AuthorName": decoded_author_name})
 
         books = list(books)
+        list_book = []
         for book in books:
             user = db.Users.find_one({"_id": book['SellerId']})
-            genre = db.Genres.find_one({"_id": book['Genre']})
-            shop_name = user['Shop_name']
-            book['shop_name'] = shop_name
-            book['Genre'] = genre['Theloai']
-            book['_id'] = str(book['_id'])
-            del book['SellerId']
-        return books
+            if user['Status'] == 'ban':
+                books.remove(book)
+            else:
+                genre = db.Genres.find_one({"_id": book['Genre']})
+                shop_name = user['Shop_name']
+                book['shop_name'] = shop_name
+                book['Genre'] = genre['Theloai']
+                book['_id'] = str(book['_id'])
+                del book['SellerId']
+                list_book.append(book)
+        return list_book
     except Exception as e:
         return jsonify({"error": str(e)})
 
@@ -173,17 +188,21 @@ def GetBookByGenre(genre):
         genre = db.Genres.find_one({"Theloai": decoded_genre})
         books = db.books.find({"Genre": genre['_id']})
         books = list(books)
-        print(books)
+        list_books = []
         for book in books:
             user = db.Users.find_one({"_id": book['SellerId']})
-            genre = db.Genres.find_one({"_id": book['Genre']})
+            if user['Status'] == 'ban':
+                books.remove(book)
+            else:
+                genre = db.Genres.find_one({"_id": book['Genre']})
 
-            shop_name = user['Shop_name']
-            book['Genre'] = genre['Theloai']
-            book['_id'] = str(book['_id'])
-            del book['SellerId']
-            book['shop_name'] = shop_name
-        return books
+                shop_name = user['Shop_name']
+                book['Genre'] = genre['Theloai']
+                book['_id'] = str(book['_id'])
+                del book['SellerId']
+                book['shop_name'] = shop_name
+                list_books.append(book)
+        return list_books
     except Exception as e:
         return jsonify({"error": str(e)})
 
@@ -215,7 +234,7 @@ def GetBook_Page():
     # Thực hiện truy vấn MongoDB với phân trang và giới hạn số lượng kết quả
     books = db.books.find().skip(skip).limit(limit)
     books = list(books)
-
+    list_book = []
     # Chuyển đổi kết quả trả về thành danh sách các đối tượng
     for book in books:
         book['_id'] = str(book['_id'])
@@ -225,10 +244,12 @@ def GetBook_Page():
         book['Genre'] = genre['Theloai']
         del book['SellerId']
         book['shop_name'] = shop_name
+        if user['Status'] == 'normal':
+            list_book.append(book)
     books = list(books)
     return {
-        "books": books,
-        "count": db.books.estimated_document_count(),
+        "books": list_book,
+        "count": len(list_book),
     }
 
 
@@ -338,12 +359,12 @@ def Update_book(id):
 def fix():
     try:
         # specific_datetime = datetime(2024, 5, 3, 9, 28, 57, 652000, tzinfo=pytz.utc)
-
+        result = db.Users.update_many({}, {"$unset": {"IsActivate": ""}})
         # Define the new attribute
-        new_attribute = {
-            'condition': 0
-        }
-        result = db.Discounts.update_many({}, {"$set": new_attribute})
+        # new_attribute = {
+        #     'condition': 0
+        # }
+        # result = db.Discounts.update_many({}, {"$set": new_attribute})
         return "fix ok"
     except Exception as e:
         return jsonify({"error": str(e)})

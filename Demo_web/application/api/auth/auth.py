@@ -25,6 +25,8 @@ def login():
         user_collection = db['Users']
         if check_password(email, password, user_collection):
             user = user_collection.find_one({'Email': email})
+            if user['Status'] == 'ban':
+                return jsonify({'error': "account has been ban"}), 400
             payload = {'user_id': str(user['_id']), 'role': user['Role']}
             token = jwt.encode(payload, secret_key, algorithm='HS256')
             return {
@@ -38,7 +40,6 @@ def login():
                     "Phone": user['Phone'],
                     "Address": user['Address'],
                     "Role": user['Role'],
-                    "IsActivate": user['IsActivate'],
                 },
                 "token": token,
             }
@@ -67,7 +68,7 @@ def register(email, password):
             'Phone': phone,
             'Address': address,
             'Role': role,
-            "IsActivate": 0
+            "Status": 'normal'
         }).inserted_id
     except Exception as e:
         print(f"Error: {e}")

@@ -64,7 +64,9 @@ def get_order_detail_by_user(user_id):
                 'ShippingCost': shipping['Cost'],
                 'Status': order_detail['Status'],
                 'ShopId': str(order_detail['ShopId']),
-                'shop_name': shop['Shop_name']
+                'shop_name': shop['Shop_name'],
+                'address': order['address'],
+                'phone': order['phone']
             })
 
         return jsonify({'success': True, 'order_details': order_details_list}), 200
@@ -87,7 +89,7 @@ def get_order_detail_by_shop(shop_id):
             book_ids = order_detail['BookId']
             quantities = order_detail['Quantity']
             prices = order_detail['Price']
-
+            user_id = order_detail['UserId']
             # Tạo danh sách các mặt hàng trong đơn hàng
             items = []
             for i in range(len(book_ids)):
@@ -107,6 +109,8 @@ def get_order_detail_by_shop(shop_id):
                 items.append(item)
             shop = db.Users.find_one({"_id": order_detail['ShopId']})
             discount = db.Discounts.find_one({"_id": order_detail['DiscountId']})
+            order = db.Orders.find_one({"_id": order_detail['OrderId']})
+
             if discount is None:
                 DiscountCode = ""
                 DiscountAmount = 0
@@ -124,7 +128,10 @@ def get_order_detail_by_shop(shop_id):
                 'DiscountPercent': DiscountPercent,
                 'Status': order_detail['Status'],
                 'ShopId': str(order_detail['ShopId']),
-                'shop_name': shop['Shop_name']
+                'shop_name': shop['Shop_name'],
+                'user_id': str(user_id),
+                'address': order['address'],
+                'phone': order['phone']
             })
         return jsonify({'success': True, 'order_details': order_details_list}), 200
 
@@ -154,13 +161,15 @@ def get_order_detail_by_status(user_id, status):
                     'Price': order_detail['Price'][i]
                 }
                 items.append(item)
-
+            order = db.Orders.find_one({"_id": order_detail['OrderId']})
             order_details_list.append({
                 'OrderId': str(order_detail['_id']),
                 'Items': items,
                 'Total_price': order_detail['Total_price'],
                 'DiscountId': str(order_detail['DiscountId']),
-                'ShopId': str(order_detail['ShopId'])
+                'ShopId': str(order_detail['ShopId']),
+                'address': order['address'],
+                'phone': order['phone']
             })
 
         return jsonify({'success': True, 'order_details': order_details_list}), 200
@@ -186,17 +195,35 @@ def confirm_order(order_detail_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@orderDetailBP.route('/order_cancel/<order_detail_id>', methods=['DELETE'])
+@orderDetailBP.route('/order_cancel/<order_detail_id>', methods=['PUT'])
 def cancel_order(order_detail_id):
     try:
         token = request.headers.get('Authorization')
         token = utils.extract_token(token)
         order_detail_id = ObjectId(order_detail_id)
         order_detail = db.OrderDetails.find_one({"_id": order_detail_id})
-
-        if ObjectId(token.get('user_id')) == order_detail['UserId']:
+        book_id = order_detail['BookId']
+        quantity = order_detail['Quantity']
+        discount_id = order_detail['DiscountId']
+        if ObjectId(token.get('user_id')) == order_detail['UserId'] or ObjectId(token.get('user_id')) == order_detail['ShopId']:
             # Cập nhật trạng thái của chi tiết đơn hàng thành "shipping"
-            result = db.OrderDetails.delete_one({'_id': order_detail_id})
+            result = db.OrderDetails.update_one({'_id': order_detail_id}, {'$set': {'Status': 'Đã bị hủy'}})
+            count = 0
+            for book in book_id:
+
+                db.books.update_one(
+                    {'_id': ObjectId(book)},
+                    {'$inc': {'Quantity': quantity[count]}}
+                )
+                if discount_id is None:
+                    print("don't have discount")
+                else:
+                    db.Discounts.update_one(
+                        {'_id': ObjectId(discount_id)},
+                        {'$inc': {'Quantity': 1}}
+                    )
+                count += 1
+
             return jsonify({'success': 'Cancel success'}), 200
         else:
             return jsonify({'Khong du quyen han'}), 400
